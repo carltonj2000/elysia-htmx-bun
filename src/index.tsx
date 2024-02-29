@@ -18,20 +18,46 @@ const listAllHabits = (db: Database) => {
   return db.query("select * from habits order by id desc").all() as HabitT[];
 };
 
+const getHabitById = (db: Database, id: string) => {
+  return db
+    .query("select * from habits where id = $id")
+    .get({ $id: id }) as HabitT;
+};
+
 const deleteHabitById = (db: Database, id: string) => {
-  return db.query(`delete from habits where id = ${id}`).run({ $id: id });
+  return db.query("delete from habits where id = $id").run({ $id: id });
 };
 
 const addHabit = (db: Database, title: string, description: string) => {
   const color = faker.color.rgb();
   const result = db
     .query(
-      `insert into habits (title, description, color) values ` +
+      `insert into habits title, description, color) values ` +
         `($title, $description, $color) ` +
         `returning *`
     )
     .get({ $title: title, $description: description, $color: color });
   return result as HabitT;
+};
+
+const updateHabit = (
+  db: Database,
+  title: string,
+  description: string,
+  id: string
+) => {
+  return db
+    .query(
+      `update habits set ` +
+        `title = $title, description = $description ` +
+        `where id = $id ` +
+        `returning *`
+    )
+    .get({
+      $title: title,
+      $description: description,
+      $id: id,
+    }) as HabitT;
 };
 
 const TitleInput = ({ title }: { title: string }) => {
@@ -92,6 +118,34 @@ const AddHabitForm = () => {
   );
 };
 
+const EditHabitForm = ({ habit }: { habit: HabitT }) => {
+  return (
+    <form
+      class={"w-full rounded-md border-slate-700 border p-4 mb-4"}
+      id="form"
+      hx-put={`/habit/edit/${habit.id}`}
+      hx-target={"this"}
+      hx-swap={"outerHTML"}
+    >
+      <TitleInput title={habit.title} />
+      <DescriptionInput description={habit.description} />
+      <div class={"flex gap-1 mt-3"}>
+        <button class={"px-3 py-1 bg-gray-500 rounded-md"} type="submit">
+          Save Edits
+        </button>
+        <button
+          class={"px-3 py-1 bg-sky-500 rounded-md"}
+          hx-get={`/habit/edit/cancel/${habit.id}`}
+          hx-target={"#form"}
+          hx-swap={"outerHTML"}
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+};
+
 const AddHabit = () => {
   return (
     <button
@@ -117,7 +171,14 @@ const HabitComponent = ({ habit }: { habit: HabitT }) => {
       <h1 class={"font-bold"}>{habit.title}</h1>
       <p class={"text-sm text-gray-500"}>{habit.description}</p>
       <div class={"flex gap-1 text-sm mt-3"}>
-        <button class={"hover:text-sky-700"}>Edit</button>
+        <button
+          class={"hover:text-sky-700"}
+          hx-get={`/habit/edit/${habit.id}`}
+          hx-target={`#habit-${habit.id}`}
+          hx-swap={"outerHTML"}
+        >
+          Edit
+        </button>
         <span>•</span>
         <button
           class={"hover:text-red-700"}
@@ -173,7 +234,6 @@ const app = new Elysia()
   .use(html())
   .get("/", rootHandler)
   .delete("/habit/:id", ({ params: { id } }) => {
-    console.log("deleting habit by id:", id);
     deleteHabitById(db, id);
     return null;
   })
@@ -181,7 +241,6 @@ const app = new Elysia()
   .get("/habit/add/cancel", AddHabit)
   .post("/habit", ({ body }) => {
     const result = addHabit(db, body.title, body.description);
-    console.log({ result });
     return (
       <>
         <AddHabit />
@@ -189,6 +248,21 @@ const app = new Elysia()
       </>
     );
   })
+  .get("/habit/edit/cancel/:id", ({ params: { id } }) => {
+    const habit = getHabitById(db, id);
+    return <HabitComponent habit={habit} />;
+  })
+  .get("/habit/edit/:id", ({ params: { id } }) => {
+    const habit = getHabitById(db, id);
+    return <EditHabitForm habit={habit} />;
+  })
+  .put(
+    "/habit/edit/:id",
+    ({ params: { id }, body }: { params: { id: string }; body: HabitT }) => {
+      const result = updateHabit(db, body.title, body.description, id);
+      return <HabitComponent habit={result} />;
+    }
+  )
   .listen(3000);
 
 console.log(
