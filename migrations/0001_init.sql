@@ -9,6 +9,20 @@ CREATE TABLE
 CREATE TABLE
     IF NOT EXISTS habits_history (habit_id INTEGER, date TEXT NOT NULL);
 
+CREATE TABLE
+    users (
+        id TEXT NOT NULL PRIMARY KEY,
+        google_id TEXT UNIQUE
+    );
+
+CREATE TABLE
+    sessions (
+        id TEXT NOT NULL PRIMARY KEY,
+        expires_at INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES user (id)
+    );
+
 INSERT INTO
     habits (title, description, color)
 VALUES

@@ -40,3 +40,7 @@ yarn-error.log*
 **/*.log
 package-lock.json
 **/*.bun
+
+# cj add start
+client_secret.json
+# cj add end

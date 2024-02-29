@@ -3,11 +3,27 @@ import { html } from "@elysiajs/html";
 import { Database } from "bun:sqlite";
 import { migrate, getMigrations } from "bun-sqlite-migrations";
 import { faker } from "@faker-js/faker";
-import { j } from "elysia/dist/index-59i0HOI0";
-import classNames from "classnames";
+import { BunSQLiteAdapter } from "@lucia-auth/adapter-sqlite";
+import { Lucia } from "lucia";
 
-const db = new Database(":memory:");
+import { auth } from "./auth";
+
+const db = new Database("local.sqlite");
 migrate(db, getMigrations("./migrations"));
+
+const adapter = new BunSQLiteAdapter(db, {
+  user: "users",
+  session: "sessions",
+});
+
+const lucia = new Lucia(adapter, {
+  sessionCookie: {
+    attributes: {
+      // secure: process.env.NODE_ENV === "production",
+      secure: false,
+    },
+  },
+});
 
 type HabitT = {
   id: number;
@@ -220,9 +236,9 @@ const HabitHistoryItem = ({
       hx-post={`/habit/completed/${habit.id}/${habitHistory.date}`}
       hx-target={"this"}
       hx-swap={"outerHTML"}
-      class={classNames(`w-4 h-4 rounded bg-[${habit.color}]`, {
-        "bg-purple-700": habitHistory.completed,
-      })}
+      class={`w-4 h-4 rounded ${
+        !habitHistory.completed ? "bg-gray-700" : `bg-[${habit.color}]`
+      }`}
     ></div>
   );
 };
@@ -304,6 +320,7 @@ const rootHandler = () => {
 
 const app = new Elysia()
   .use(html())
+  .use(auth)
   .get("/", rootHandler)
   .delete("/habit/:id", ({ params: { id } }) => {
     deleteHabitById(db, id);

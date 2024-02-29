@@ -15,6 +15,10 @@ bun add @elysiajs/html
 bun add bun-sqlite-migrations
 bun add @faker-js/faker
 bun add classnames
+
+bun add lucia oslo
+bun add arctic
+bun install @lucia-auth/adapter-sqlite
 ```
 
 ## Google Gemini AI Prompts
