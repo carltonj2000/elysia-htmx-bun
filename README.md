@@ -14,10 +14,15 @@ cd elysia-htmx-bun
 bun add @elysiajs/html
 bun add bun-sqlite-migrations
 bun add @faker-js/faker
+bun add classnames
 ```
 
 ## Google Gemini AI Prompts
 
 ```text
 create sqlite table (DDL) to describe habits, columns(id, title, description, color), all non null and create 10 inserts
+```
+
+```text
+create a javascript function that generates a sequence of dates (starting from today and going back N days) and for each element calculate a completed flag (boolean) with 70% false and 30% true
 ```

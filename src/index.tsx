@@ -3,6 +3,8 @@ import { html } from "@elysiajs/html";
 import { Database } from "bun:sqlite";
 import { migrate, getMigrations } from "bun-sqlite-migrations";
 import { faker } from "@faker-js/faker";
+import { j } from "elysia/dist/index-59i0HOI0";
+import classNames from "classnames";
 
 const db = new Database(":memory:");
 migrate(db, getMigrations("./migrations"));
@@ -12,6 +14,16 @@ type HabitT = {
   title: string;
   description: string;
   color: string;
+};
+
+type HabitItemHistoryT = {
+  completed: boolean;
+  date: string;
+};
+
+type HabitItemHistoryDbT = {
+  habit_id: number;
+  date: string;
 };
 
 const listAllHabits = (db: Database) => {
@@ -32,7 +44,7 @@ const addHabit = (db: Database, title: string, description: string) => {
   const color = faker.color.rgb();
   const result = db
     .query(
-      `insert into habits title, description, color) values ` +
+      `insert into habits (title, description, color) values ` +
         `($title, $description, $color) ` +
         `returning *`
     )
@@ -58,6 +70,26 @@ const updateHabit = (
       $description: description,
       $id: id,
     }) as HabitT;
+};
+
+const getHabitHistory = (db: Database, id: string, date: string) => {
+  return db
+    .query("select * from habits_history where habit_id = $id and date = $date")
+    .get({ $id: id, $date: date });
+};
+
+const addHabitHistory = (db: Database, id: string, date: string) => {
+  return db
+    .query(
+      "insert into habits_history (habit_id, date) values ($id, $date) returning *"
+    )
+    .get({ $id: id, $date: date });
+};
+
+const deleteHabitHistory = (db: Database, id: string, date: string) => {
+  return db
+    .query("delete from habits_history where habit_id = $id and date = $date")
+    .get({ $id: id, $date: date });
 };
 
 const TitleInput = ({ title }: { title: string }) => {
@@ -162,7 +194,41 @@ const AddHabit = () => {
   );
 };
 
+function generateDatesWithCompletion(numberOfDays: number) {
+  const dates: HabitItemHistoryT[] = [];
+  const today = new Date();
+
+  for (let i = 0; i < numberOfDays; i++) {
+    const newDate = new Date(today.getTime() - i * 24 * 60 * 60 * 1000);
+    const completed = Math.random() < 0.3; // 30% chance of true
+    dates.push({ date: newDate.toISOString().slice(0, 10), completed });
+  }
+
+  return dates;
+}
+
+const HabitHistoryItem = ({
+  habit,
+  habitHistory,
+}: {
+  habit: HabitT;
+  habitHistory: HabitItemHistoryT;
+}) => {
+  return (
+    <div
+      title={habitHistory.date}
+      hx-post={`/habit/completed/${habit.id}/${habitHistory.date}`}
+      hx-target={"this"}
+      hx-swap={"outerHTML"}
+      class={classNames(`w-4 h-4 rounded bg-[${habit.color}]`, {
+        "bg-purple-700": habitHistory.completed,
+      })}
+    ></div>
+  );
+};
+
 const HabitComponent = ({ habit }: { habit: HabitT }) => {
+  const habitHistory = generateDatesWithCompletion(90);
   return (
     <div
       class="border border-gray-700 rounded-md mb-4 p-4"
@@ -170,6 +236,11 @@ const HabitComponent = ({ habit }: { habit: HabitT }) => {
     >
       <h1 class={"font-bold"}>{habit.title}</h1>
       <p class={"text-sm text-gray-500"}>{habit.description}</p>
+      <div class={"flex gap-1 flex-wrap"}>
+        {habitHistory.map((d) => (
+          <HabitHistoryItem habit={habit} habitHistory={d} />
+        ))}
+      </div>
       <div class={"flex gap-1 text-sm mt-3"}>
         <button
           class={"hover:text-sky-700"}
@@ -230,6 +301,7 @@ const rootHandler = () => {
     </html>
   );
 };
+
 const app = new Elysia()
   .use(html())
   .get("/", rootHandler)
@@ -263,6 +335,22 @@ const app = new Elysia()
       return <HabitComponent habit={result} />;
     }
   )
+  .post("/habit/completed/:id/:date", ({ params: { id, date } }) => {
+    const habit = getHabitById(db, id);
+    const history = getHabitHistory(db, id, date);
+    let completed = false;
+    if (history) {
+      const del = deleteHabitHistory(db, id, date);
+      console.log({ del });
+    } else {
+      const add = addHabitHistory(db, id, date);
+      console.log({ add });
+      completed = true;
+    }
+    return (
+      <HabitHistoryItem habit={habit} habitHistory={{ date, completed }} />
+    );
+  })
   .listen(3000);
 
 console.log(
